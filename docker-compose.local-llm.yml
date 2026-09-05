@@ -1,0 +1,23 @@
+# Joins the gateway and dashboard to local-ai-models' external network so
+# they can reach the llama-cpp OpenAI-compatible server by container hostname.
+# Both need it: the dashboard runs its own embedded agent session, separate
+# from the gateway service's.
+# Usage: docker compose -f docker-compose.windows.yml -f docker-compose.local-llm.yml up -d
+networks:
+  local-bridge:
+    external: true
+
+services:
+  gateway:
+    networks:
+      - default
+      - local-bridge
+    volumes:
+      - C:/Users/maxva/Repositories:/workspace/repos
+
+  dashboard:
+    networks:
+      - default
+      - local-bridge
+    volumes:
+      - C:/Users/maxva/Repositories:/workspace/repos
