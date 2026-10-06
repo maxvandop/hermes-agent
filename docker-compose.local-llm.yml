@@ -14,6 +14,21 @@ services:
       - local-bridge
     volumes:
       - C:/Users/maxva/Repositories:/workspace/repos
+    environment:
+      # Read-only Docker API for self-diagnosis (docker ps/logs/stats), e.g.:
+      #   curl http://docker-proxy:2375/containers/json
+      - HOST_DOCKER_API_URL=http://docker-proxy:2375
+    depends_on:
+      - docker-proxy
+    # GPU telemetry only (nvidia-smi) so the agent can self-diagnose load
+    # instead of assuming an external caller — no compute workload runs here.
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
 
   dashboard:
     networks:
@@ -21,3 +36,30 @@ services:
       - local-bridge
     volumes:
       - C:/Users/maxva/Repositories:/workspace/repos
+
+  # Read-only Docker API access so the agent can inspect container state
+  # (docker ps/logs/stats) to self-diagnose load. No host port, no mutating
+  # endpoints — start/stop/exec/restart/images/volumes/networks all stay off.
+  docker-proxy:
+    image: tecnativa/docker-socket-proxy:latest
+    container_name: hermes-docker-proxy
+    restart: unless-stopped
+    networks:
+      - default
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - CONTAINERS=1
+      - INFO=1
+      - PING=1
+      - POST=0
+      - EXEC=0
+      - ALLOW_START=0
+      - ALLOW_STOP=0
+      - ALLOW_RESTARTS=0
+      - IMAGES=0
+      - NETWORKS=0
+      - VOLUMES=0
+      - SERVICES=0
+      - SWARM=0
+      - SYSTEM=0
