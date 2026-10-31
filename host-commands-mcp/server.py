@@ -93,11 +93,27 @@ def _structurally_safe(command: str) -> bool:
     - `<` `>`  redirection
     - `` ` `` backtick (line continuation / escape injection)
 
-    Any command containing one of these is NOT auto-runnable, regardless of
-    whether it matches an allowlist pattern. It still goes through the
-    pending-approval flow where a human can judge it individually.
+    Unsafe characters inside single- or double-quoted segments are NOT
+    structural: `docker ps --format "{{.Names}} | {{.Status}}"` is a literal
+    argument to one executable, not a pipeline. fnmatch (and fnmatchcase,
+    which is what Windows uses) does not treat `*?[]` inside quotes specially
+    either, so quoted unsafe chars are safe to match literally.
+
+    Any command containing an unsafe character OUTSIDE quotes is NOT
+    auto-runnable, regardless of whether it matches an allowlist pattern. It
+    still goes through the pending-approval flow where a human can judge it
+    individually.
     """
-    return not any(ch in command for ch in "|`;&<>")
+    in_single = in_double = False
+    for ch in command:
+        if ch == "'" and not in_double:
+            in_single = not in_single
+        elif ch == '"' and not in_single:
+            in_double = not in_double
+        elif (ch in "|`;&<>") and not in_single and not in_double:
+            return False
+    # Unbalanced quotes would make the rest of the string ambiguous.
+    return not (in_single or in_double)
 
 
 def _is_allowed(command: str, patterns: list[str]) -> bool:
